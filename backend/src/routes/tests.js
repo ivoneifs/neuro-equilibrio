@@ -79,6 +79,61 @@ router.delete("/normative-tables/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+router.get("/:code/score-bands", (req, res) => {
+  const test = db.prepare("SELECT * FROM tests WHERE code = ?").get(req.params.code);
+  if (!test) return res.status(404).json({ error: "Teste não encontrado" });
+
+  const rows = db
+    .prepare(
+      `SELECT sb.*, s.code as subtest_code, s.name as subtest_name
+       FROM score_bands sb
+       JOIN subtests s ON s.id = sb.subtest_id
+       WHERE s.test_id = ?
+       ORDER BY s.display_order, sb.min_raw`
+    )
+    .all(test.id);
+  res.json(rows);
+});
+
+// RF13: faixa de corte fixa por escore bruto (ex.: BDI-II, BAI, MEEM).
+router.post("/:code/score-bands", (req, res) => {
+  const test = db.prepare("SELECT * FROM tests WHERE code = ?").get(req.params.code);
+  if (!test) return res.status(404).json({ error: "Teste não encontrado" });
+
+  const { subtest_code, min_raw, max_raw, education, label, source_citation } = req.body;
+  const subtest = db
+    .prepare("SELECT * FROM subtests WHERE test_id = ? AND code = ?")
+    .get(test.id, subtest_code);
+  if (!subtest) return res.status(400).json({ error: "Subteste inválido" });
+
+  if (min_raw == null || max_raw == null || !label) {
+    return res.status(400).json({ error: "min_raw, max_raw e label são obrigatórios" });
+  }
+
+  const result = db
+    .prepare(
+      `INSERT INTO score_bands (subtest_id, min_raw, max_raw, education, label, source_citation)
+       VALUES (@subtest_id, @min_raw, @max_raw, @education, @label, @source_citation)`
+    )
+    .run({
+      subtest_id: subtest.id,
+      min_raw,
+      max_raw,
+      education: education ?? null,
+      label,
+      source_citation: source_citation ?? null,
+    });
+
+  res.status(201).json({ id: result.lastInsertRowid });
+});
+
+router.delete("/score-bands/:id", (req, res) => {
+  const existing = db.prepare("SELECT id FROM score_bands WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Registro não encontrado" });
+  db.prepare("DELETE FROM score_bands WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
 router.get("/:code/composite-conversion-tables", (req, res) => {
   const test = db.prepare("SELECT * FROM tests WHERE code = ?").get(req.params.code);
   if (!test) return res.status(404).json({ error: "Teste não encontrado" });

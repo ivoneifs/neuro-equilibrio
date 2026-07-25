@@ -16,6 +16,18 @@ function findNormativeTable(subtestId, ageYears, { education, sex } = {}) {
   return exact || null;
 }
 
+function findScoreBand(subtestId, rawScore, { education } = {}) {
+  const rows = db
+    .prepare(
+      `SELECT * FROM score_bands
+       WHERE subtest_id = ? AND min_raw <= ? AND max_raw >= ?
+       ORDER BY (education IS NOT NULL) DESC`
+    )
+    .all(subtestId, rawScore, rawScore);
+
+  return rows.find((r) => !r.education || r.education === education) || null;
+}
+
 // RF12/RF14: calcula uma sessão de aplicação de teste a partir de escores brutos manuais,
 // resolvendo subtestes derivados, buscando a tabela normativa da faixa etária e convertendo
 // para z-score, escore ponderado, percentil e classificação (Guilmette et al., 2020).
@@ -39,6 +51,23 @@ export function computeTestSession({ testId, patientId, applicationDate, ageYear
   for (const st of subtests) {
     const raw = resolvedRaw[st.code];
     if (raw == null) continue;
+
+    if (st.scoring_method === "cutoff") {
+      const band = findScoreBand(st.id, raw, { education });
+      results.push({
+        subtestId: st.id,
+        code: st.code,
+        name: st.name,
+        rawScore: raw,
+        normativeTableId: null,
+        z: null,
+        scaledScore: null,
+        percentile: null,
+        classification: band?.label ?? null,
+        missingNorms: !band,
+      });
+      continue;
+    }
 
     const norm = findNormativeTable(st.id, ageYears, { education, sex });
     let z = null, scaled = null, percentile = null, classification = null;

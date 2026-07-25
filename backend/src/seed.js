@@ -16,8 +16,8 @@ function seedTest(code, name, description, subtestDefs) {
     if (already) return;
     db.prepare(
       `INSERT INTO subtests
-        (test_id, code, name, unit, direction, scale_mean, scale_sd, derived_from_a, derived_from_b, display_order)
-       VALUES (@test_id, @code, @name, @unit, @direction, @scale_mean, @scale_sd, @derived_from_a, @derived_from_b, @display_order)`
+        (test_id, code, name, unit, direction, scale_mean, scale_sd, derived_from_a, derived_from_b, scoring_method, display_order)
+       VALUES (@test_id, @code, @name, @unit, @direction, @scale_mean, @scale_sd, @derived_from_a, @derived_from_b, @scoring_method, @display_order)`
     ).run({
       test_id: testId,
       code: st.code,
@@ -28,9 +28,29 @@ function seedTest(code, name, description, subtestDefs) {
       scale_sd: st.scale_sd ?? 3,
       derived_from_a: st.derivedFromA ?? null,
       derived_from_b: st.derivedFromB ?? null,
+      scoring_method: st.scoringMethod ?? "z_score",
       display_order: index,
     });
   });
+
+  return testId;
+}
+
+function seedScoreBands(testCode, subtestCode, bands) {
+  const test = db.prepare("SELECT id FROM tests WHERE code = ?").get(testCode);
+  if (!test) return;
+  const subtest = db.prepare("SELECT id FROM subtests WHERE test_id = ? AND code = ?").get(test.id, subtestCode);
+  if (!subtest) return;
+
+  const already = db.prepare("SELECT id FROM score_bands WHERE subtest_id = ? LIMIT 1").get(subtest.id);
+  if (already) return;
+
+  for (const b of bands) {
+    db.prepare(
+      `INSERT INTO score_bands (subtest_id, min_raw, max_raw, education, label, source_citation)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(subtest.id, b.minRaw, b.maxRaw, b.education ?? null, b.label, b.sourceCitation ?? null);
+  }
 }
 
 function seedComposites(testCode, compositeDefs) {
@@ -115,3 +135,76 @@ seedComposites("WISC-IV", [
     ],
   },
 ]);
+
+// Instrumentos de humor/rastreio com faixas de corte fixas (scoring_method 'cutoff'),
+// em vez de conversão estatística por média/DP. Faixas abaixo são as usualmente citadas
+// na literatura/manual de cada instrumento — devem ser confirmadas pelo profissional
+// responsável antes de uso clínico (RF13, Seção 7.1/7.9 do projeto).
+seedTest(
+  "BDI-II",
+  "Inventário de Depressão de Beck (BDI-II)",
+  "Escala de autorrelato de 21 itens para sintomas depressivos (Beck, Steer e Brown, 1996).",
+  [{ code: "escore_total", name: "Escore Total", unit: "pontos", direction: "higher_better", scoringMethod: "cutoff" }]
+);
+seedScoreBands("BDI-II", "escore_total", [
+  { minRaw: 0, maxRaw: 13, label: "Mínimo", sourceCitation: "Beck, Steer & Brown (1996)" },
+  { minRaw: 14, maxRaw: 19, label: "Leve", sourceCitation: "Beck, Steer & Brown (1996)" },
+  { minRaw: 20, maxRaw: 28, label: "Moderado", sourceCitation: "Beck, Steer & Brown (1996)" },
+  { minRaw: 29, maxRaw: 63, label: "Grave", sourceCitation: "Beck, Steer & Brown (1996)" },
+]);
+
+seedTest(
+  "BAI",
+  "Inventário de Ansiedade de Beck (BAI)",
+  "Escala de autorrelato de 21 itens para sintomas de ansiedade (Beck, Epstein, Brown e Steer, 1988).",
+  [{ code: "escore_total", name: "Escore Total", unit: "pontos", direction: "higher_better", scoringMethod: "cutoff" }]
+);
+seedScoreBands("BAI", "escore_total", [
+  { minRaw: 0, maxRaw: 7, label: "Mínimo", sourceCitation: "Beck, Epstein, Brown & Steer (1988)" },
+  { minRaw: 8, maxRaw: 15, label: "Leve", sourceCitation: "Beck, Epstein, Brown & Steer (1988)" },
+  { minRaw: 16, maxRaw: 25, label: "Moderado", sourceCitation: "Beck, Epstein, Brown & Steer (1988)" },
+  { minRaw: 26, maxRaw: 63, label: "Grave", sourceCitation: "Beck, Epstein, Brown & Steer (1988)" },
+]);
+
+seedTest(
+  "MEEM",
+  "Mini Exame do Estado Mental (MEEM)",
+  "Rastreio cognitivo breve, 0-30 pontos, ponto de corte ajustado por escolaridade (Folstein et al., 1975; adaptação brasileira: Bertolucci et al., 1994).",
+  [{ code: "escore_total", name: "Escore Total", unit: "pontos", direction: "higher_better", scoringMethod: "cutoff" }]
+);
+seedScoreBands("MEEM", "escore_total", [
+  { minRaw: 0, maxRaw: 12, education: "analfabeto", label: "Sugestivo de déficit cognitivo", sourceCitation: "Bertolucci et al. (1994) — validar com manual atual" },
+  { minRaw: 13, maxRaw: 30, education: "analfabeto", label: "Dentro do esperado", sourceCitation: "Bertolucci et al. (1994) — validar com manual atual" },
+  { minRaw: 0, maxRaw: 17, education: "fundamental_incompleto", label: "Sugestivo de déficit cognitivo", sourceCitation: "Bertolucci et al. (1994) — validar com manual atual" },
+  { minRaw: 18, maxRaw: 30, education: "fundamental_incompleto", label: "Dentro do esperado", sourceCitation: "Bertolucci et al. (1994) — validar com manual atual" },
+  { minRaw: 0, maxRaw: 25, education: "medio_superior", label: "Sugestivo de déficit cognitivo", sourceCitation: "Bertolucci et al. (1994) — validar com manual atual" },
+  { minRaw: 26, maxRaw: 30, education: "medio_superior", label: "Dentro do esperado", sourceCitation: "Bertolucci et al. (1994) — validar com manual atual" },
+]);
+
+seedTest(
+  "TRILHAS",
+  "Teste de Trilhas (Trail Making Test — Partes A e B)",
+  "Avalia atenção visual, velocidade de processamento e flexibilidade cognitiva (Reitan, 1958).",
+  [
+    { code: "parte_a", name: "Parte A", unit: "segundos", direction: "lower_better" },
+    { code: "parte_b", name: "Parte B", unit: "segundos", direction: "lower_better" },
+    {
+      code: "diferenca_b_a",
+      name: "Diferença B−A (custo de alternância)",
+      unit: "segundos",
+      direction: "lower_better",
+      derivedFromA: "parte_b",
+      derivedFromB: "parte_a",
+    },
+  ]
+);
+
+seedTest(
+  "TFV",
+  "Teste de Fluência Verbal (fonêmica e semântica)",
+  "Avalia funções executivas e linguagem por meio da geração de palavras em 60 segundos.",
+  [
+    { code: "fonemica", name: "Fluência Fonêmica (palavras)", unit: "palavras", direction: "higher_better" },
+    { code: "semantica", name: "Fluência Semântica (palavras)", unit: "palavras", direction: "higher_better" },
+  ]
+);

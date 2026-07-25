@@ -62,6 +62,8 @@ db.exec(`
   );
 
   -- Cada subteste/medida de um teste. direction indica se escore bruto maior é melhor ou pior.
+  -- scoring_method 'z_score' (padrão, usa normative_tables) ou 'cutoff' (usa score_bands,
+  -- para instrumentos com faixas de corte fixas, ex.: BDI-II, BAI, MEEM).
   CREATE TABLE IF NOT EXISTS subtests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     test_id INTEGER NOT NULL,
@@ -73,9 +75,22 @@ db.exec(`
     scale_sd REAL NOT NULL DEFAULT 3,
     derived_from_a TEXT,
     derived_from_b TEXT,
+    scoring_method TEXT NOT NULL DEFAULT 'z_score',
     display_order INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (test_id) REFERENCES tests(id),
     UNIQUE (test_id, code)
+  );
+
+  -- Faixas de corte fixas por escore bruto (e opcionalmente escolaridade), parametrizáveis (RF13).
+  CREATE TABLE IF NOT EXISTS score_bands (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subtest_id INTEGER NOT NULL,
+    min_raw REAL NOT NULL,
+    max_raw REAL NOT NULL,
+    education TEXT,
+    label TEXT NOT NULL,
+    source_citation TEXT,
+    FOREIGN KEY (subtest_id) REFERENCES subtests(id)
   );
 
   -- RF13/RF19: tabelas normativas parametrizáveis por idade (e opcionalmente escolaridade/sexo), versionadas.
@@ -161,5 +176,14 @@ db.exec(`
     FOREIGN KEY (composite_id) REFERENCES composite_indices(id)
   );
 `);
+
+// Migração leve para bancos já existentes: adiciona colunas novas que "CREATE TABLE IF NOT EXISTS" não cobre.
+function ensureColumn(table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+ensureColumn("subtests", "scoring_method", "TEXT NOT NULL DEFAULT 'z_score'");
 
 export default db;

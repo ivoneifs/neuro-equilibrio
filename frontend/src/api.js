@@ -36,6 +36,11 @@ export const api = {
     request(`/api/tests/${code}/normative-tables`, { method: "POST", body: payload, token }),
   deleteNormativeTable: (id, token) =>
     request(`/api/tests/normative-tables/${id}`, { method: "DELETE", token }),
+  listScoreBands: (code, token) => request(`/api/tests/${code}/score-bands`, { token }),
+  createScoreBand: (code, payload, token) =>
+    request(`/api/tests/${code}/score-bands`, { method: "POST", body: payload, token }),
+  deleteScoreBand: (id, token) => request(`/api/tests/score-bands/${id}`, { method: "DELETE", token }),
+
   listCompositeConversionTables: (code, token) =>
     request(`/api/tests/${code}/composite-conversion-tables`, { token }),
   createCompositeConversionTable: (code, payload, token) =>

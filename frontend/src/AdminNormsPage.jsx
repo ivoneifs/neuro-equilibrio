@@ -4,6 +4,7 @@ import { api } from "./api";
 
 const emptyNorm = { subtest_code: "", age_min_years: "", age_max_years: "", education: "", sex: "", mean: "", sd: "", source_citation: "" };
 const emptyComposite = { composite_code: "", sum_scaled_score: "", composite_score: "", percentile: "", ci_lower_95: "", ci_upper_95: "" };
+const emptyBand = { subtest_code: "", min_raw: "", max_raw: "", education: "", label: "", source_citation: "" };
 
 export function AdminNormsPage() {
   const { token } = useAuth();
@@ -12,8 +13,10 @@ export function AdminNormsPage() {
   const [test, setTest] = useState(null);
   const [norms, setNorms] = useState([]);
   const [composites, setComposites] = useState([]);
+  const [bands, setBands] = useState([]);
   const [normForm, setNormForm] = useState(emptyNorm);
   const [compositeForm, setCompositeForm] = useState(emptyComposite);
+  const [bandForm, setBandForm] = useState(emptyBand);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -21,14 +24,16 @@ export function AdminNormsPage() {
   }, []);
 
   async function loadTestData(code) {
-    const [t, n, c] = await Promise.all([
+    const [t, n, c, b] = await Promise.all([
       api.getTest(code, token),
       api.listNormativeTables(code, token),
       api.listCompositeConversionTables(code, token),
+      api.listScoreBands(code, token),
     ]);
     setTest(t);
     setNorms(n);
     setComposites(c);
+    setBands(b);
   }
 
   useEffect(() => {
@@ -38,6 +43,7 @@ export function AdminNormsPage() {
     }
     setNormForm(emptyNorm);
     setCompositeForm(emptyComposite);
+    setBandForm(emptyBand);
     loadTestData(testCode);
   }, [testCode]);
 
@@ -67,6 +73,32 @@ export function AdminNormsPage() {
 
   async function handleDeleteNorm(id) {
     await api.deleteNormativeTable(id, token);
+    await loadTestData(testCode);
+  }
+
+  async function handleAddBand(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      await api.createScoreBand(
+        testCode,
+        {
+          ...bandForm,
+          min_raw: Number(bandForm.min_raw),
+          max_raw: Number(bandForm.max_raw),
+          education: bandForm.education || null,
+        },
+        token
+      );
+      setBandForm(emptyBand);
+      await loadTestData(testCode);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDeleteBand(id) {
+    await api.deleteScoreBand(id, token);
     await loadTestData(testCode);
   }
 
@@ -119,8 +151,12 @@ export function AdminNormsPage() {
         </label>
       </div>
 
-      {test && (
+      {test && (() => {
+        const zScoreSubtests = test.subtests.filter((s) => s.scoring_method !== "cutoff");
+        const cutoffSubtests = test.subtests.filter((s) => s.scoring_method === "cutoff");
+        return (
         <>
+          {zScoreSubtests.length > 0 && (
           <form className="card" onSubmit={handleAddNorm}>
             <h3>Nova tabela normativa (subteste)</h3>
             <div className="form-grid">
@@ -132,7 +168,7 @@ export function AdminNormsPage() {
                   required
                 >
                   <option value="">Selecione...</option>
-                  {test.subtests.map((s) => (
+                  {zScoreSubtests.map((s) => (
                     <option key={s.code} value={s.code}>{s.name}</option>
                   ))}
                 </select>
@@ -179,11 +215,12 @@ export function AdminNormsPage() {
             {error && <p className="error">{error}</p>}
             <button type="submit">Adicionar tabela</button>
           </form>
+          )}
 
+          {norms.length > 0 && (
           <div className="card">
             <h3>Tabelas cadastradas</h3>
-            {norms.length === 0 ? <p>Nenhuma ainda.</p> : (
-              <table>
+            <table>
                 <thead>
                   <tr><th>Subteste</th><th>Faixa etária</th><th>Média</th><th>DP</th><th>Fonte</th><th></th></tr>
                 </thead>
@@ -199,9 +236,82 @@ export function AdminNormsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            )}
+            </table>
           </div>
+          )}
+
+          {cutoffSubtests.length > 0 && (
+            <>
+              <form className="card" onSubmit={handleAddBand}>
+                <h3>Nova faixa de corte (subteste)</h3>
+                <div className="form-grid">
+                  <label>
+                    Subteste
+                    <select
+                      value={bandForm.subtest_code}
+                      onChange={(e) => setBandForm({ ...bandForm, subtest_code: e.target.value })}
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {cutoffSubtests.map((s) => (
+                        <option key={s.code} value={s.code}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Escore mín.
+                    <input type="number" step="any" value={bandForm.min_raw}
+                      onChange={(e) => setBandForm({ ...bandForm, min_raw: e.target.value })} required />
+                  </label>
+                  <label>
+                    Escore máx.
+                    <input type="number" step="any" value={bandForm.max_raw}
+                      onChange={(e) => setBandForm({ ...bandForm, max_raw: e.target.value })} required />
+                  </label>
+                  <label>
+                    Escolaridade (opcional)
+                    <input value={bandForm.education}
+                      onChange={(e) => setBandForm({ ...bandForm, education: e.target.value })} />
+                  </label>
+                  <label>
+                    Classificação
+                    <input value={bandForm.label}
+                      onChange={(e) => setBandForm({ ...bandForm, label: e.target.value })}
+                      placeholder="Ex: Moderado" required />
+                  </label>
+                  <label>
+                    Fonte/citação
+                    <input value={bandForm.source_citation}
+                      onChange={(e) => setBandForm({ ...bandForm, source_citation: e.target.value })} />
+                  </label>
+                </div>
+                <button type="submit">Adicionar faixa</button>
+              </form>
+
+              {bands.length > 0 && (
+              <div className="card">
+                <h3>Faixas cadastradas</h3>
+                <table>
+                  <thead>
+                    <tr><th>Subteste</th><th>Faixa</th><th>Escolaridade</th><th>Classificação</th><th>Fonte</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {bands.map((b) => (
+                      <tr key={b.id}>
+                        <td>{b.subtest_name}</td>
+                        <td>{b.min_raw}–{b.max_raw}</td>
+                        <td>{b.education ?? "-"}</td>
+                        <td>{b.label}</td>
+                        <td>{b.source_citation}</td>
+                        <td><button type="button" onClick={() => handleDeleteBand(b.id)}>Excluir</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              )}
+            </>
+          )}
 
           {test.composites?.length > 0 && (
             <>
@@ -274,7 +384,8 @@ export function AdminNormsPage() {
             </>
           )}
         </>
-      )}
+        );
+      })()}
     </div>
   );
 }
