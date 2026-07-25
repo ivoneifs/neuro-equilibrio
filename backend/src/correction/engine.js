@@ -102,10 +102,21 @@ export function computeTestSession({ testId, patientId, applicationDate, ageYear
   const sessionId = sessionResult.lastInsertRowid;
 
   const insertScore = db.prepare(
-    "INSERT INTO test_raw_scores (session_id, subtest_id, raw_score, normative_table_id) VALUES (?, ?, ?, ?)"
+    `INSERT INTO test_raw_scores
+      (session_id, subtest_id, raw_score, normative_table_id, z, scaled_score, percentile, classification)
+     VALUES (@session_id, @subtest_id, @raw_score, @normative_table_id, @z, @scaled_score, @percentile, @classification)`
   );
   for (const r of results) {
-    insertScore.run(sessionId, r.subtestId, r.rawScore, r.normativeTableId);
+    insertScore.run({
+      session_id: sessionId,
+      subtest_id: r.subtestId,
+      raw_score: r.rawScore,
+      normative_table_id: r.normativeTableId,
+      z: r.z,
+      scaled_score: r.scaledScore,
+      percentile: r.percentile,
+      classification: r.classification,
+    });
   }
 
   const composites = computeComposites({ testId, sessionId, results });

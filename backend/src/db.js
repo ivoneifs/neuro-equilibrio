@@ -122,13 +122,20 @@ db.exec(`
     FOREIGN KEY (applied_by_user_id) REFERENCES users(id)
   );
 
-  -- RF12: escores brutos por subteste, com referência à tabela normativa usada (rastreabilidade RF19).
+  -- RF12: escores brutos por subteste, com o resultado já calculado no momento da aplicação
+  -- (z/escore ponderado/percentil/classificação — ou classificação de faixa de corte). Guardar o
+  -- resultado em vez de recalculá-lo depois evita duplicar a lógica do motor (z_score vs cutoff)
+  -- em cada lugar que exibe o laudo, e preserva o que foi mostrado ao profissional (RF19).
   CREATE TABLE IF NOT EXISTS test_raw_scores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id INTEGER NOT NULL,
     subtest_id INTEGER NOT NULL,
     raw_score REAL NOT NULL,
     normative_table_id INTEGER,
+    z REAL,
+    scaled_score REAL,
+    percentile REAL,
+    classification TEXT,
     FOREIGN KEY (session_id) REFERENCES test_sessions(id),
     FOREIGN KEY (subtest_id) REFERENCES subtests(id),
     FOREIGN KEY (normative_table_id) REFERENCES normative_tables(id)
@@ -175,6 +182,22 @@ db.exec(`
     FOREIGN KEY (session_id) REFERENCES test_sessions(id),
     FOREIGN KEY (composite_id) REFERENCES composite_indices(id)
   );
+
+  -- RF23/RF26: laudo consolidando um ou mais sessões de teste, com texto interpretativo editável (RF14).
+  CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    created_by_user_id INTEGER,
+    title TEXT NOT NULL,
+    demand_description TEXT,
+    interpretive_text TEXT,
+    conclusion TEXT,
+    referral_suggestions TEXT,
+    test_session_ids TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (patient_id) REFERENCES patients(id),
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+  );
 `);
 
 // Migração leve para bancos já existentes: adiciona colunas novas que "CREATE TABLE IF NOT EXISTS" não cobre.
@@ -185,5 +208,12 @@ function ensureColumn(table, column, definition) {
   }
 }
 ensureColumn("subtests", "scoring_method", "TEXT NOT NULL DEFAULT 'z_score'");
+// RF24: dados exibidos no cabeçalho/rodapé do laudo.
+ensureColumn("users", "crp", "TEXT");
+ensureColumn("users", "clinic_name", "TEXT");
+ensureColumn("test_raw_scores", "z", "REAL");
+ensureColumn("test_raw_scores", "scaled_score", "REAL");
+ensureColumn("test_raw_scores", "percentile", "REAL");
+ensureColumn("test_raw_scores", "classification", "TEXT");
 
 export default db;

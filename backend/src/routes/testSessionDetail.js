@@ -15,7 +15,8 @@ router.get("/:id", (req, res) => {
 
   const scores = db
     .prepare(
-      `SELECT trs.raw_score, s.code, s.name, s.unit, nt.mean, nt.sd, nt.source_citation
+      `SELECT trs.raw_score, trs.z, trs.scaled_score, trs.percentile, trs.classification,
+              s.code, s.name, s.unit, nt.mean, nt.sd, nt.source_citation
        FROM test_raw_scores trs
        JOIN subtests s ON s.id = trs.subtest_id
        LEFT JOIN normative_tables nt ON nt.id = trs.normative_table_id

@@ -55,7 +55,11 @@ export function ApplyTestPage() {
 
   return (
     <div className="page">
-      <p><Link to="/">← Voltar para pacientes</Link></p>
+      <p>
+        <Link to="/">← Voltar para pacientes</Link>
+        {" · "}
+        <Link to={`/patients/${patientId}/report`}>Gerar laudo</Link>
+      </p>
       <h2>Aplicar teste</h2>
 
       <form className="card" onSubmit={handleSubmit}>

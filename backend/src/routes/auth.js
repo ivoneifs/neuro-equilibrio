@@ -75,7 +75,9 @@ export function getUserFromRequest(req) {
   const session = db.prepare("SELECT * FROM sessions WHERE token = ?").get(token);
   if (!session || new Date(session.expires_at) < new Date()) return null;
 
-  const user = db.prepare("SELECT id, name, email, role FROM users WHERE id = ?").get(session.user_id);
+  const user = db
+    .prepare("SELECT id, name, email, role, crp, clinic_name FROM users WHERE id = ?")
+    .get(session.user_id);
   return user || null;
 }
 

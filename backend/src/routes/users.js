@@ -8,21 +8,21 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 router.get("/", (req, res) => {
   const users = db
-    .prepare("SELECT id, name, email, role, created_at FROM users ORDER BY name")
+    .prepare("SELECT id, name, email, role, crp, clinic_name, created_at FROM users ORDER BY name")
     .all();
   res.json(users);
 });
 
 router.get("/:id", (req, res) => {
   const user = db
-    .prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?")
+    .prepare("SELECT id, name, email, role, crp, clinic_name, created_at FROM users WHERE id = ?")
     .get(req.params.id);
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
   res.json(user);
 });
 
 router.post("/", (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, crp, clinic_name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: "Nome é obrigatório" });
   if (!email || !EMAIL_RE.test(email)) return res.status(400).json({ error: "E-mail inválido" });
   if (!password || password.length < 8) {
@@ -37,11 +37,13 @@ router.post("/", (req, res) => {
 
   const password_hash = hashPassword(password);
   const result = db
-    .prepare("INSERT INTO users (name, email, password_hash, role) VALUES (@name, @email, @password_hash, @role)")
-    .run({ name, email, password_hash, role });
+    .prepare(
+      "INSERT INTO users (name, email, password_hash, role, crp, clinic_name) VALUES (@name, @email, @password_hash, @role, @crp, @clinic_name)"
+    )
+    .run({ name, email, password_hash, role, crp: crp || null, clinic_name: clinic_name || null });
 
   const user = db
-    .prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?")
+    .prepare("SELECT id, name, email, role, crp, clinic_name, created_at FROM users WHERE id = ?")
     .get(result.lastInsertRowid);
   res.status(201).json(user);
 });
@@ -53,6 +55,8 @@ router.put("/:id", (req, res) => {
   const name = req.body.name ?? existing.name;
   const email = req.body.email ?? existing.email;
   const role = req.body.role ?? existing.role;
+  const crp = req.body.crp ?? existing.crp;
+  const clinic_name = req.body.clinic_name ?? existing.clinic_name;
 
   if (!name.trim()) return res.status(400).json({ error: "Nome é obrigatório" });
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "E-mail inválido" });
@@ -76,11 +80,12 @@ router.put("/:id", (req, res) => {
     : existing.password_hash;
 
   db.prepare(
-    "UPDATE users SET name = @name, email = @email, role = @role, password_hash = @password_hash WHERE id = @id"
-  ).run({ name, email, role, password_hash, id: req.params.id });
+    `UPDATE users SET name = @name, email = @email, role = @role, password_hash = @password_hash,
+     crp = @crp, clinic_name = @clinic_name WHERE id = @id`
+  ).run({ name, email, role, password_hash, crp: crp || null, clinic_name: clinic_name || null, id: req.params.id });
 
   const user = db
-    .prepare("SELECT id, name, email, role, created_at FROM users WHERE id = ?")
+    .prepare("SELECT id, name, email, role, crp, clinic_name, created_at FROM users WHERE id = ?")
     .get(req.params.id);
   res.json(user);
 });

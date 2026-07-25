@@ -52,4 +52,17 @@ export const api = {
   applyTestSession: (patientId, payload, token) =>
     request(`/api/patients/${patientId}/test-sessions`, { method: "POST", body: payload, token }),
   getTestSession: (id, token) => request(`/api/test-sessions/${id}`, { token }),
+
+  listReports: (patientId, token) => request(`/api/patients/${patientId}/reports`, { token }),
+  draftReportText: (patientId, sessionIds, token) =>
+    request(`/api/patients/${patientId}/reports/draft?session_ids=${sessionIds.join(",")}`, { token }),
+  createReport: (patientId, payload, token) =>
+    request(`/api/patients/${patientId}/reports`, { method: "POST", body: payload, token }),
+  async fetchReportPdfBlob(patientId, reportId, token) {
+    const res = await fetch(`${API_URL}/api/patients/${patientId}/reports/${reportId}/pdf`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Não foi possível gerar o PDF");
+    return res.blob();
+  },
 };

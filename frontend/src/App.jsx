@@ -6,6 +6,7 @@ import { PatientsPage } from "./PatientsPage";
 import { AdminUsersPage } from "./AdminUsersPage";
 import { ApplyTestPage } from "./ApplyTestPage";
 import { AdminNormsPage } from "./AdminNormsPage";
+import { ReportPage } from "./ReportPage";
 
 function App() {
   const { user, loading } = useAuth();
@@ -19,6 +20,7 @@ function App() {
       <Routes>
         <Route path="/" element={<PatientsPage />} />
         <Route path="/patients/:patientId/apply-test" element={<ApplyTestPage />} />
+        <Route path="/patients/:patientId/report" element={<ReportPage />} />
         {user.role === "administrador" && <Route path="/admin" element={<AdminUsersPage />} />}
         {user.role === "administrador" && <Route path="/admin/norms" element={<AdminNormsPage />} />}
       </Routes>
