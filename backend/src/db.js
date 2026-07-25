@@ -1,0 +1,165 @@
+import { DatabaseSync } from "node:sqlite";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const db = new DatabaseSync(path.join(__dirname, "..", "data.sqlite"));
+
+db.exec("PRAGMA journal_mode = WAL");
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS patients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    full_name TEXT NOT NULL,
+    cpf TEXT,
+    birth_date TEXT NOT NULL,
+    sex TEXT,
+    education TEXT,
+    father_name TEXT,
+    mother_name TEXT,
+    address TEXT,
+    phone TEXT,
+    email TEXT,
+    legal_guardian TEXT,
+    archived INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS patient_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (patient_id) REFERENCES patients(id)
+  );
+
+  -- RF27: perfis de usuário (administrador, psicólogo, secretaria/recepção, informante externo).
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'psicologo',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  -- RF11/RF18: catálogo extensível de testes neuropsicológicos ("plugins" - Seção 5.2 do CLAUDE.md).
+  CREATE TABLE IF NOT EXISTS tests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT
+  );
+
+  -- Cada subteste/medida de um teste. direction indica se escore bruto maior é melhor ou pior.
+  CREATE TABLE IF NOT EXISTS subtests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    test_id INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    unit TEXT,
+    direction TEXT NOT NULL DEFAULT 'higher_better',
+    scale_mean REAL NOT NULL DEFAULT 10,
+    scale_sd REAL NOT NULL DEFAULT 3,
+    derived_from_a TEXT,
+    derived_from_b TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (test_id) REFERENCES tests(id),
+    UNIQUE (test_id, code)
+  );
+
+  -- RF13/RF19: tabelas normativas parametrizáveis por idade (e opcionalmente escolaridade/sexo), versionadas.
+  CREATE TABLE IF NOT EXISTS normative_tables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subtest_id INTEGER NOT NULL,
+    age_min_years REAL NOT NULL,
+    age_max_years REAL NOT NULL,
+    education TEXT,
+    sex TEXT,
+    mean REAL NOT NULL,
+    sd REAL NOT NULL,
+    source_citation TEXT,
+    version TEXT NOT NULL DEFAULT '1.0',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (subtest_id) REFERENCES subtests(id)
+  );
+
+  -- RF15: sessão de aplicação de um teste a um paciente.
+  CREATE TABLE IF NOT EXISTS test_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    test_id INTEGER NOT NULL,
+    application_date TEXT NOT NULL,
+    applied_by_user_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (patient_id) REFERENCES patients(id),
+    FOREIGN KEY (test_id) REFERENCES tests(id),
+    FOREIGN KEY (applied_by_user_id) REFERENCES users(id)
+  );
+
+  -- RF12: escores brutos por subteste, com referência à tabela normativa usada (rastreabilidade RF19).
+  CREATE TABLE IF NOT EXISTS test_raw_scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    subtest_id INTEGER NOT NULL,
+    raw_score REAL NOT NULL,
+    normative_table_id INTEGER,
+    FOREIGN KEY (session_id) REFERENCES test_sessions(id),
+    FOREIGN KEY (subtest_id) REFERENCES subtests(id),
+    FOREIGN KEY (normative_table_id) REFERENCES normative_tables(id)
+  );
+
+  -- Índices compostos (ex.: WISC-IV QI Total, ICV, IOP, IMO, IVP): soma dos escores
+  -- ponderados dos subtestes membros, convertida em escore composto (mean 100 / sd 15).
+  CREATE TABLE IF NOT EXISTS composite_indices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    test_id INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    subtest_codes TEXT NOT NULL,
+    scale_mean REAL NOT NULL DEFAULT 100,
+    scale_sd REAL NOT NULL DEFAULT 15,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (test_id) REFERENCES tests(id),
+    UNIQUE (test_id, code)
+  );
+
+  -- Tabela oficial soma-de-ponderados -> composto (do manual do teste). Busca exata por soma.
+  CREATE TABLE IF NOT EXISTS composite_conversion_tables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    composite_id INTEGER NOT NULL,
+    sum_scaled_score INTEGER NOT NULL,
+    composite_score REAL NOT NULL,
+    percentile REAL,
+    ci_lower_95 REAL,
+    ci_upper_95 REAL,
+    version TEXT NOT NULL DEFAULT '1.0',
+    FOREIGN KEY (composite_id) REFERENCES composite_indices(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS test_composite_scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    composite_id INTEGER NOT NULL,
+    sum_scaled_score REAL NOT NULL,
+    composite_score REAL,
+    percentile REAL,
+    ci_lower_95 REAL,
+    ci_upper_95 REAL,
+    is_approximate INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (session_id) REFERENCES test_sessions(id),
+    FOREIGN KEY (composite_id) REFERENCES composite_indices(id)
+  );
+`);
+
+export default db;
