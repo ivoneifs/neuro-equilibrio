@@ -113,7 +113,7 @@ export function ApplyTestPage() {
           <table>
             <thead>
               <tr>
-                <th>Subteste</th><th>Bruto</th><th>Z</th><th>Ponderado</th><th>Percentil</th><th>Classificação</th>
+                <th>Subteste</th><th>Bruto</th><th>Z</th><th>Ponderado</th><th>Percentil</th><th>Classificação</th><th>Idade Eq.</th>
               </tr>
             </thead>
             <tbody>
@@ -125,6 +125,7 @@ export function ApplyTestPage() {
                   <td>{r.scaledScore != null ? r.scaledScore.toFixed(1) : "—"}</td>
                   <td>{r.percentile != null ? r.percentile.toFixed(1) : "—"}</td>
                   <td>{r.classification ?? (r.missingNorms ? "sem tabela normativa" : "—")}</td>
+                  <td>{r.ageEquivalent ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -135,7 +136,7 @@ export function ApplyTestPage() {
               <h4>Índices compostos</h4>
               <table>
                 <thead>
-                  <tr><th>Índice</th><th>Soma ponderados</th><th>Escore</th><th>Percentil</th><th></th></tr>
+                  <tr><th>Índice</th><th>Soma ponderados</th><th>Escore</th><th>Percentil</th><th>Idade Eq.</th><th></th></tr>
                 </thead>
                 <tbody>
                   {result.composites.map((c) => (
@@ -144,6 +145,7 @@ export function ApplyTestPage() {
                       <td>{c.sumScaledScore}</td>
                       <td>{c.compositeScore?.toFixed(1)}</td>
                       <td>{c.percentile?.toFixed(1)}</td>
+                      <td>{c.ageEquivalent ?? "—"}</td>
                       <td>{c.isApproximate && "estimativa (sem tabela oficial)"}</td>
                     </tr>
                   ))}

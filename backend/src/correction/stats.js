@@ -38,3 +38,10 @@ export function classify(z) {
   if (z >= -2) return "Limítrofe";
   return "Deficitário";
 }
+
+export function formatAgeMonths(months, isFloor) {
+  if (months == null) return null;
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return `${isFloor ? "< " : ""}${years}a, ${rest}m`;
+}

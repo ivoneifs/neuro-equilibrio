@@ -5,6 +5,7 @@ import { api } from "./api";
 const emptyNorm = { subtest_code: "", age_min_years: "", age_max_years: "", education: "", sex: "", mean: "", sd: "", source_citation: "" };
 const emptyComposite = { composite_code: "", sum_scaled_score: "", composite_score: "", percentile: "", ci_lower_95: "", ci_upper_95: "" };
 const emptyBand = { subtest_code: "", min_raw: "", max_raw: "", education: "", label: "", source_citation: "" };
+const emptyAgeEq = { subtest_code: "", min_raw: "", max_raw: "", age_years: "", age_months: "", is_floor: false, source_citation: "" };
 
 export function AdminNormsPage() {
   const { token } = useAuth();
@@ -14,9 +15,11 @@ export function AdminNormsPage() {
   const [norms, setNorms] = useState([]);
   const [composites, setComposites] = useState([]);
   const [bands, setBands] = useState([]);
+  const [ageEquivalents, setAgeEquivalents] = useState([]);
   const [normForm, setNormForm] = useState(emptyNorm);
   const [compositeForm, setCompositeForm] = useState(emptyComposite);
   const [bandForm, setBandForm] = useState(emptyBand);
+  const [ageEqForm, setAgeEqForm] = useState(emptyAgeEq);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -24,16 +27,18 @@ export function AdminNormsPage() {
   }, []);
 
   async function loadTestData(code) {
-    const [t, n, c, b] = await Promise.all([
+    const [t, n, c, b, a] = await Promise.all([
       api.getTest(code, token),
       api.listNormativeTables(code, token),
       api.listCompositeConversionTables(code, token),
       api.listScoreBands(code, token),
+      api.listAgeEquivalentTables(code, token),
     ]);
     setTest(t);
     setNorms(n);
     setComposites(c);
     setBands(b);
+    setAgeEquivalents(a);
   }
 
   useEffect(() => {
@@ -44,6 +49,7 @@ export function AdminNormsPage() {
     setNormForm(emptyNorm);
     setCompositeForm(emptyComposite);
     setBandForm(emptyBand);
+    setAgeEqForm(emptyAgeEq);
     loadTestData(testCode);
   }, [testCode]);
 
@@ -95,6 +101,33 @@ export function AdminNormsPage() {
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  async function handleAddAgeEq(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      await api.createAgeEquivalentTable(
+        testCode,
+        {
+          ...ageEqForm,
+          min_raw: Number(ageEqForm.min_raw),
+          max_raw: Number(ageEqForm.max_raw),
+          age_years: Number(ageEqForm.age_years),
+          age_months: Number(ageEqForm.age_months),
+        },
+        token
+      );
+      setAgeEqForm(emptyAgeEq);
+      await loadTestData(testCode);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDeleteAgeEq(id) {
+    await api.deleteAgeEquivalentTable(id, token);
+    await loadTestData(testCode);
   }
 
   async function handleDeleteBand(id) {
@@ -238,6 +271,82 @@ export function AdminNormsPage() {
                 </tbody>
             </table>
           </div>
+          )}
+
+          {zScoreSubtests.length > 0 && (
+            <>
+              <form className="card" onSubmit={handleAddAgeEq}>
+                <h3>Nova idade equivalente (subteste)</h3>
+                <div className="form-grid">
+                  <label>
+                    Subteste
+                    <select
+                      value={ageEqForm.subtest_code}
+                      onChange={(e) => setAgeEqForm({ ...ageEqForm, subtest_code: e.target.value })}
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {zScoreSubtests.map((s) => (
+                        <option key={s.code} value={s.code}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Escore mín.
+                    <input type="number" step="any" value={ageEqForm.min_raw}
+                      onChange={(e) => setAgeEqForm({ ...ageEqForm, min_raw: e.target.value })} required />
+                  </label>
+                  <label>
+                    Escore máx.
+                    <input type="number" step="any" value={ageEqForm.max_raw}
+                      onChange={(e) => setAgeEqForm({ ...ageEqForm, max_raw: e.target.value })} required />
+                  </label>
+                  <label>
+                    Idade equivalente — anos
+                    <input type="number" value={ageEqForm.age_years}
+                      onChange={(e) => setAgeEqForm({ ...ageEqForm, age_years: e.target.value })} required />
+                  </label>
+                  <label>
+                    Idade equivalente — meses
+                    <input type="number" min="0" max="11" value={ageEqForm.age_months}
+                      onChange={(e) => setAgeEqForm({ ...ageEqForm, age_months: e.target.value })} required />
+                  </label>
+                  <label>
+                    <input type="checkbox" checked={ageEqForm.is_floor}
+                      onChange={(e) => setAgeEqForm({ ...ageEqForm, is_floor: e.target.checked })} />
+                    {" "}Piso da tabela (exibir como "menor que")
+                  </label>
+                  <label>
+                    Fonte/citação
+                    <input value={ageEqForm.source_citation}
+                      onChange={(e) => setAgeEqForm({ ...ageEqForm, source_citation: e.target.value })} />
+                  </label>
+                </div>
+                <button type="submit">Adicionar idade equivalente</button>
+              </form>
+
+              {ageEquivalents.length > 0 && (
+              <div className="card">
+                <h3>Idades equivalentes cadastradas</h3>
+                <table>
+                  <thead>
+                    <tr><th>Subteste</th><th>Faixa bruta</th><th>Idade equivalente</th><th>Fonte</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {ageEquivalents.map((a) => (
+                      <tr key={a.id}>
+                        <td>{a.subtest_name}</td>
+                        <td>{a.min_raw}–{a.max_raw}</td>
+                        <td>{a.is_floor ? "< " : ""}{Math.floor(a.age_months / 12)}a, {a.age_months % 12}m</td>
+                        <td>{a.source_citation}</td>
+                        <td><button type="button" onClick={() => handleDeleteAgeEq(a.id)}>Excluir</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              )}
+            </>
           )}
 
           {cutoffSubtests.length > 0 && (

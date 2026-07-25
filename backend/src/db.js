@@ -109,6 +109,19 @@ db.exec(`
     FOREIGN KEY (subtest_id) REFERENCES subtests(id)
   );
 
+  -- Idade equivalente (idade mental): escore bruto -> idade típica de desempenho, por subteste.
+  -- is_floor indica que o escore está no piso da tabela do manual (exibir como "< idade").
+  CREATE TABLE IF NOT EXISTS age_equivalent_tables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subtest_id INTEGER NOT NULL,
+    min_raw REAL NOT NULL,
+    max_raw REAL NOT NULL,
+    age_months INTEGER NOT NULL,
+    is_floor INTEGER NOT NULL DEFAULT 0,
+    source_citation TEXT,
+    FOREIGN KEY (subtest_id) REFERENCES subtests(id)
+  );
+
   -- RF15: sessão de aplicação de um teste a um paciente.
   CREATE TABLE IF NOT EXISTS test_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,6 +149,8 @@ db.exec(`
     scaled_score REAL,
     percentile REAL,
     classification TEXT,
+    age_equivalent_months INTEGER,
+    age_equivalent_is_floor INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES test_sessions(id),
     FOREIGN KEY (subtest_id) REFERENCES subtests(id),
     FOREIGN KEY (normative_table_id) REFERENCES normative_tables(id)
@@ -179,6 +194,8 @@ db.exec(`
     ci_lower_95 REAL,
     ci_upper_95 REAL,
     is_approximate INTEGER NOT NULL DEFAULT 0,
+    age_equivalent_months INTEGER,
+    age_equivalent_is_floor INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES test_sessions(id),
     FOREIGN KEY (composite_id) REFERENCES composite_indices(id)
   );
@@ -215,5 +232,9 @@ ensureColumn("test_raw_scores", "z", "REAL");
 ensureColumn("test_raw_scores", "scaled_score", "REAL");
 ensureColumn("test_raw_scores", "percentile", "REAL");
 ensureColumn("test_raw_scores", "classification", "TEXT");
+ensureColumn("test_raw_scores", "age_equivalent_months", "INTEGER");
+ensureColumn("test_raw_scores", "age_equivalent_is_floor", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("test_composite_scores", "age_equivalent_months", "INTEGER");
+ensureColumn("test_composite_scores", "age_equivalent_is_floor", "INTEGER NOT NULL DEFAULT 0");
 
 export default db;

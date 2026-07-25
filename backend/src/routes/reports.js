@@ -1,6 +1,7 @@
 import { Router } from "express";
 import db from "../db.js";
 import { calculateAge } from "../age.js";
+import { formatAgeMonths } from "../correction/stats.js";
 import { buildReportPdf } from "../reports/pdf.js";
 import { buildDraftInterpretiveText } from "../reports/draftText.js";
 
@@ -20,7 +21,8 @@ function loadSessionData(sessionId) {
 
   const scores = db
     .prepare(
-      `SELECT trs.raw_score, trs.z, trs.percentile, trs.classification, trs.normative_table_id, s.name
+      `SELECT trs.raw_score, trs.z, trs.percentile, trs.classification, trs.normative_table_id,
+              trs.age_equivalent_months, trs.age_equivalent_is_floor, s.name
        FROM test_raw_scores trs
        JOIN subtests s ON s.id = trs.subtest_id
        WHERE trs.session_id = ?
@@ -34,6 +36,7 @@ function loadSessionData(sessionId) {
       percentile: row.percentile,
       classification: row.classification,
       missing_norms: row.classification == null,
+      age_equivalent: formatAgeMonths(row.age_equivalent_months, !!row.age_equivalent_is_floor),
     }));
 
   const composites = db
@@ -44,7 +47,11 @@ function loadSessionData(sessionId) {
        WHERE tcs.session_id = ?
        ORDER BY ci.display_order`
     )
-    .all(sessionId);
+    .all(sessionId)
+    .map((row) => ({
+      ...row,
+      age_equivalent: formatAgeMonths(row.age_equivalent_months, !!row.age_equivalent_is_floor),
+    }));
 
   return { ...session, scores, composites };
 }

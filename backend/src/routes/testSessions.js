@@ -2,6 +2,7 @@ import { Router } from "express";
 import db from "../db.js";
 import { calculateAge } from "../age.js";
 import { computeTestSession } from "../correction/engine.js";
+import { formatAgeMonths } from "../correction/stats.js";
 
 const router = Router({ mergeParams: true });
 
@@ -21,7 +22,7 @@ router.post("/", (req, res) => {
   const age = calculateAge(patient.birth_date, application_date);
   const ageYears = age.years + age.months / 12;
 
-  const { sessionId, results } = computeTestSession({
+  const { sessionId, results, composites } = computeTestSession({
     testId: test.id,
     patientId: patient.id,
     applicationDate: application_date,
@@ -32,7 +33,16 @@ router.post("/", (req, res) => {
     appliedByUserId: req.user.id,
   });
 
-  res.status(201).json({ sessionId, ageAtApplication: age, results });
+  const formattedResults = results.map((r) => ({
+    ...r,
+    ageEquivalent: formatAgeMonths(r.ageEquivalentMonths, r.ageEquivalentIsFloor),
+  }));
+  const formattedComposites = composites.map((c) => ({
+    ...c,
+    ageEquivalent: formatAgeMonths(c.ageEquivalentMonths, c.ageEquivalentIsFloor),
+  }));
+
+  res.status(201).json({ sessionId, ageAtApplication: age, results: formattedResults, composites: formattedComposites });
 });
 
 router.get("/", (req, res) => {

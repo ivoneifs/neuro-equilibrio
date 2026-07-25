@@ -116,6 +116,12 @@ seedTest(
     { code: "codigo", name: "Código (CD)", unit: "pontos", direction: "higher_better" },
     { code: "seq_numeros_letras", name: "Sequência de Números e Letras (SNL)", unit: "pontos", direction: "higher_better" },
     { code: "procurar_simbolos", name: "Procurar Símbolos (PS)", unit: "pontos", direction: "higher_better" },
+    // Subtestes suplementares: não entram na soma dos índices/QI Total, apenas informativos.
+    { code: "completar_figuras", name: "Completar Figuras (CF)", unit: "pontos", direction: "higher_better" },
+    { code: "cancelamento", name: "Cancelamento (CA)", unit: "pontos", direction: "higher_better" },
+    { code: "informacao", name: "Informação (IN)", unit: "pontos", direction: "higher_better" },
+    { code: "aritmetica", name: "Aritmética (AR)", unit: "pontos", direction: "higher_better" },
+    { code: "raciocinio_palavras", name: "Raciocínio com Palavras (RP)", unit: "pontos", direction: "higher_better" },
   ]
 );
 

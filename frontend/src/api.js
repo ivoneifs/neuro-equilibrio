@@ -41,6 +41,12 @@ export const api = {
     request(`/api/tests/${code}/score-bands`, { method: "POST", body: payload, token }),
   deleteScoreBand: (id, token) => request(`/api/tests/score-bands/${id}`, { method: "DELETE", token }),
 
+  listAgeEquivalentTables: (code, token) => request(`/api/tests/${code}/age-equivalent-tables`, { token }),
+  createAgeEquivalentTable: (code, payload, token) =>
+    request(`/api/tests/${code}/age-equivalent-tables`, { method: "POST", body: payload, token }),
+  deleteAgeEquivalentTable: (id, token) =>
+    request(`/api/tests/age-equivalent-tables/${id}`, { method: "DELETE", token }),
+
   listCompositeConversionTables: (code, token) =>
     request(`/api/tests/${code}/composite-conversion-tables`, { token }),
   createCompositeConversionTable: (code, payload, token) =>

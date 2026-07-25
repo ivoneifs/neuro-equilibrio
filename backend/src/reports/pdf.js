@@ -69,7 +69,13 @@ export function buildReportPdf({ report, patient, ageAtReport, professional, ses
       doc.text(String(score.raw_score), colX[1], rowY);
       doc.text(score.z != null ? score.z.toFixed(2) : "—", colX[2], rowY);
       doc.text(score.percentile != null ? score.percentile.toFixed(1) : "—", colX[3], rowY);
-      doc.text(score.classification ?? (score.missing_norms ? "sem norma" : "—"), colX[4], rowY, { width: 100 });
+      const classificationText = score.classification ?? (score.missing_norms ? "sem norma" : "—");
+      doc.text(
+        classificationText + (score.age_equivalent ? ` (${score.age_equivalent})` : ""),
+        colX[4],
+        rowY,
+        { width: 110 }
+      );
       doc.y = Math.max(doc.y, afterY);
     }
 
@@ -80,6 +86,7 @@ export function buildReportPdf({ report, patient, ageAtReport, professional, ses
         doc.text(
           `${c.name}: ${c.composite_score?.toFixed(1) ?? "—"}` +
             (c.percentile != null ? ` (percentil ${c.percentile.toFixed(1)})` : "") +
+            (c.age_equivalent ? ` — idade equivalente: ${c.age_equivalent}` : "") +
             (c.is_approximate ? " [estimativa — sem tabela oficial]" : "")
         );
       }
